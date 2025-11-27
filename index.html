@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 小说创作工作台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+        :root {
+            --gradient-start: #7c3aed;
+            --gradient-end: #ec4899;
+        }
+
+        * {
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.15), transparent 35%),
+                        radial-gradient(circle at 80% 0%, rgba(236, 72, 153, 0.2), transparent 40%),
+                        linear-gradient(135deg, #f3e8ff 0%, #e0f2fe 45%, #ffe4f3 100%);
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 35px 80px rgba(124, 58, 237, 0.2);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .content-area {
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(124, 58, 237, 0.5);
+            border-radius: 4px;
+        }
+
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.5s ease;
+        }
+
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+
+        .slide-enter-active, .slide-leave-active {
+            transition: all 0.3s ease;
+        }
+
+        .slide-enter-from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+
+        .slide-leave-to {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .loading-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: bounce 1.2s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) {
+            animation-delay: -0.24s;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: -0.12s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .journey-step {
+            position: relative;
+            padding-left: 2.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .journey-step:last-child::after {
+            display: none;
+        }
+
+        .journey-step::before {
+            content: '';
+            position: absolute;
+            left: 0.6rem;
+            top: 0.4rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #d1d5db;
+        }
+
+        .journey-step::after {
+            content: '';
+            position: absolute;
+            left: 1.1rem;
+            top: 1.2rem;
+            width: 2px;
+            height: calc(100% - 0.6rem);
+            background: #e5e7eb;
+        }
+
+        .journey-step.active::before {
+            background: var(--gradient-start);
+            box-shadow: 0 0 12px rgba(124, 58, 237, 0.5);
+        }
+
+        .journey-step.completed::before {
+            background: #10b981;
+        }
+
+        .metadata-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(124, 58, 237, 0.08);
+            color: rgba(15, 23, 42, 0.8);
+            font-size: 0.85rem;
+        }
+
+        .toast {
+            box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15);
+        }
+
+        @media (max-width: 768px) {
+            .journey-step {
+                padding-left: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="relative z-10">
+        <header class="py-12 px-4">
+            <div class="max-w-7xl mx-auto grid gap-10 lg:grid-cols-2 items-center">
+                <div>
+                    <p class="text-sm uppercase tracking-[0.4em] text-purple-500 font-semibold">AI Story Atelier</p>
+                    <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mt-4 leading-snug">
+                        沉浸式 <span class="gradient-text">AI 小说创作工作台</span>
+                    </h1>
+                    <p class="text-gray-600 mt-4 max-w-2xl">
+                        通过可视化的 13 步创作流程和实时元数据追踪，AI 帮助你高效完成世界观构建、章节创作与伏笔管理，打造连贯沉浸的故事体验。
+                    </p>
+                    <div class="flex flex-wrap items-center gap-4 mt-6">
+                        <button 
+                            @click="scrollToWizard"
+                            class="px-6 py-3 gradient-bg text-white rounded-full font-semibold shadow-lg hover:scale-105 transition"
+                        >
+                            <i class="fas fa-play mr-2"></i>立即开始创作
+                        </button>
+                        <button 
+                            @click="exportProject"
+                            class="px-6 py-3 border-2 border-purple-200 text-purple-700 rounded-full font-semibold hover:bg-purple-50 transition"
+                        >
+                            <i class="fas fa-download mr-2"></i>导出当前进度
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-8 mt-10 text-gray-600">
+                        <div>
+                            <p class="text-3xl font-bold text-gray-900">{{ steps.length }}</p>
+                            <p class="text-sm">流程节点</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-bold text-gray-900">{{ chapters.length || novelInfo.chapterCount || 0 }}</p>
+                            <p class="text-sm">预计章节</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-bold text-gray-900">{{ completedChapters }}</p>
+                            <p class="text-sm">已完成章节</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-bold text-gray-900">{{ storageMode === 'file' ? '本地文件' : '浏览器缓存' }}</p>
+                            <p class="text-sm">存储策略</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-panel rounded-3xl p-6 md:p-8">
+                    <p class="text-sm uppercase tracking-wide text-purple-500 font-semibold">Flow Highlights</p>
+                    <div class="grid grid-cols-2 gap-4 mt-6">
+                        <div class="p-4 rounded-2xl bg-white/80">
+                            <p class="text-xs text-gray-500">AI 调用</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-2">大纲 · 细纲 · 章节</p>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-white/80">
+                            <p class="text-xs text-gray-500">创作守则</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-2">伏笔 · 连贯性</p>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-white/80 col-span-2">
+                            <p class="text-xs text-gray-500">实时存储</p>
+                            <p class="text-lg font-semibold text-gray-900 mt-1">
+                                {{ storageMode === 'file' ? '写入自选 JSON 文件' : '自动保存至本地浏览器缓存' }}
+                            </p>
+                            <p class="text-xs text-gray-500 mt-2">完成 File API 授权后，所有规划与章节将实时同步到指定文件。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main id="wizard" class="max-w-7xl mx-auto px-4 pb-16">
+            <transition name="fade" mode="out-in">
+                <section v-if="currentStep === 'config'" key="config" class="min-h-[60vh] flex items-center justify-center">
+                    <div class="glass-card max-w-3xl w-full rounded-3xl p-8 md:p-10 shadow-2xl">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">配置 AI 服务</h2>
+                        <p class="text-gray-600">连接任意兼容 OpenAI 接口的模型，支持自定义 Base URL 与 API Key，所有凭据仅存储在本地。</p>
+                        <div class="grid gap-6 mt-8">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Base URL</label>
+                                <input v-model="config.baseUrl" type="text" placeholder="https://api.openai.com/v1" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Model Name</label>
+                                <input v-model="config.modelName" type="text" placeholder="gpt-4o" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">API Key</label>
+                                <input v-model="config.apiKey" type="password" placeholder="sk-..." class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                            </div>
+                        </div>
+                        <button 
+                            @click="saveConfig"
+                            :disabled="!isConfigValid"
+                            class="mt-8 w-full py-3 rounded-2xl font-semibold text-white transition" 
+                            :class="isConfigValid ? 'gradient-bg hover:scale-[1.01]' : 'bg-gray-400 cursor-not-allowed'"
+                        >
+                            保存配置并继续
+                        </button>
+                        <p class="text-xs text-gray-500 mt-4">提示：API Key 仅保留在当前设备，可随时在设置中重置。</p>
+                    </div>
+                </section>
+
+                <div v-else key="main" class="space-y-8">
+                    <div class="bg-white rounded-3xl shadow-xl p-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <p class="text-sm text-gray-500">当前项目</p>
+                                <h2 class="text-2xl font-bold text-gray-900 mt-1">{{ novelInfo.title || '未命名作品' }}</h2>
+                            </div>
+                            <div class="flex flex-wrap gap-3">
+                                <button @click="exportProject" class="px-4 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition">
+                                    <i class="fas fa-download mr-2"></i>导出
+                                </button>
+                                <button @click="importProject" class="px-4 py-2 rounded-xl bg-green-500 text-white hover:bg-green-600 transition">
+                                    <i class="fas fa-upload mr-2"></i>导入
+                                </button>
+                                <button @click="resetProject" class="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition">
+                                    <i class="fas fa-rotate mr-2"></i>重置
+                                </button>
+                                <button 
+                                    v-if="fileStorageSupported"
+                                    @click="enableFileStorage"
+                                    class="px-4 py-2 rounded-xl border border-purple-300 text-purple-600 hover:bg-purple-50 transition"
+                                >
+                                    <i class="fas fa-save mr-2"></i>{{ storageMode === 'file' ? '文件存储已启用' : '启用本地文件存储' }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-6 text-xs text-gray-500 mt-4">
+                            <span><i class="fas fa-clock mr-2"></i>上次保存：{{ lastSaved ? formatTimestamp(lastSaved) : '尚未保存' }}</span>
+                            <span><i class="fas fa-hdd mr-2"></i>当前存储：{{ storageMode === 'file' ? '自选 JSON 文件' : '浏览器缓存' }}</span>
+                        </div>
+                        <div class="mt-6">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-sm font-semibold text-gray-600">创作流程</h3>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 mt-4">
+                                <div v-for="step in steps" :key="step.id" class="flex-1 flex flex-col items-center">
+                                    <div 
+                                        class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold transition" 
+                                        :class="{
+                                            'gradient-bg text-white shadow-lg': currentStep === step.id,
+                                            'bg-green-500 text-white': isStepCompleted(step.id) && currentStep !== step.id,
+                                            'bg-gray-100 text-gray-400': !isStepCompleted(step.id) && currentStep !== step.id
+                                        }"
+                                    >
+                                        <i :class="step.icon" v-if="currentStep === step.id || !isStepCompleted(step.id)"></i>
+                                        <i class="fas fa-check" v-else></i>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2">{{ step.name }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-6 lg:grid-cols-[320px,1fr]">
+                        <aside class="space-y-6">
+                            <div class="bg-white rounded-3xl shadow-xl p-6">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                    <i class="fas fa-database text-purple-500"></i> 数据存储
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-3">
+                                    当前采用 <span class="font-semibold text-gray-700">{{ storageMode === 'file' ? 'File API 本地文件' : '浏览器缓存' }}</span> 保存，支持手动导出 JSON 备份。
+                                </p>
+                                <div class="flex flex-col gap-3 mt-6">
+                                    <button @click="manualSave" class="w-full py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition">
+                                        <i class="fas fa-floppy-disk mr-2"></i>立即保存
+                                    </button>
+                                    <button @click="exportProject" class="w-full py-2 rounded-xl border border-purple-200 text-purple-600 hover:bg-purple-50 transition">
+                                        <i class="fas fa-file-export mr-2"></i>导出 JSON
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-3xl shadow-xl p-6">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                    <i class="fas fa-chart-line text-purple-500"></i> 创作进度
+                                </h3>
+                                <ul class="mt-4 space-y-2 text-sm text-gray-600">
+                                    <li>章节摘要：{{ chapters.length ? chapters.length + ' 章' : '待生成' }}</li>
+                                    <li>已完成章节：{{ completedChapters }}/{{ chapters.length || novelInfo.chapterCount || '-' }}</li>
+                                    <li>当前阶段：{{ stepLabel }}</li>
+                                </ul>
+                            </div>
+                            <div class="bg-white rounded-3xl shadow-xl p-6">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                    <i class="fas fa-lightbulb text-purple-500"></i> 元数据快照
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-3" v-if="aggregatedMetadata.protagonist">
+                                    主角：{{ aggregatedMetadata.protagonist.name || aggregatedMetadata.protagonist }}
+                                </p>
+                                <p class="text-sm text-gray-500" v-else>等待章节完成后自动生成。</p>
+                                <div class="flex flex-wrap gap-2 mt-4" v-if="aggregatedMetadata.characters.length">
+                                    <span class="metadata-pill" v-for="role in aggregatedMetadata.characters.slice(0, 4)" :key="role.name">
+                                        <i class="fas fa-user"></i>{{ role.name }} · {{ role.role }}
+                                    </span>
+                                </div>
+                            </div>
+                        </aside>
+
+                        <section class="space-y-6">
+                            <transition name="slide" mode="out-in">
+                                <div v-if="currentStep === 'novel-info'" key="novel-info" class="bg-white rounded-3xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold text-gray-900 mb-6"><i class="fas fa-pencil-alt text-purple-500 mr-3"></i>小说基本信息</h3>
+                                    <div class="space-y-6">
+                                        <div class="grid md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label class="text-sm font-semibold text-gray-600">作品名称</label>
+                                                <input v-model="novelInfo.title" type="text" placeholder="例如：长夜余烬" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                                            </div>
+                                            <div>
+                                                <label class="text-sm font-semibold text-gray-600">目标章节数</label>
+                                                <input v-model.number="novelInfo.chapterCount" type="number" min="4" max="80" placeholder="12" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-semibold text-gray-600">小说描述 <span class="text-red-500">*</span></label>
+                                            <textarea v-model="novelInfo.description" rows="6" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar" placeholder="请描述小说的世界观、主角背景、核心冲突等关键信息..."></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-semibold text-gray-600">参考内容（选填）</label>
+                                            <textarea v-model="novelInfo.reference" rows="4" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar" placeholder="补充参考的故事设定、灵感来源、已有章节等"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-semibold text-gray-600">文风要求（选填）</label>
+                                            <input v-model="novelInfo.style" type="text" placeholder="古风 / 赛博朋克 / 轻松日常 / 历史群像..." class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                                        </div>
+                                        <button 
+                                            @click="generateOutline"
+                                            :disabled="!novelInfo.description || isLoading"
+                                            class="w-full py-3 rounded-2xl font-semibold text-white transition"
+                                            :class="novelInfo.description && !isLoading ? 'gradient-bg hover:scale-[1.01]' : 'bg-gray-400 cursor-not-allowed'"
+                                        >
+                                            <span v-if="!isLoading"><i class="fas fa-magic mr-2"></i>生成整体大纲</span>
+                                            <span v-else class="loading-dots"><span></span><span></span><span></span></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div v-else-if="currentStep === 'outline'" key="outline" class="bg-white rounded-3xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold text-gray-900 mb-6"><i class="fas fa-project-diagram text-purple-500 mr-3"></i>整体大纲</h3>
+                                    <textarea v-model="outline" rows="16" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar content-area" placeholder="AI 生成的大纲会显示在此处，您可以自由调整章节结构与冲突走向"></textarea>
+                                    <div class="flex flex-wrap gap-4 mt-6">
+                                        <button @click="confirmOutline" :disabled="!outline || isLoading" class="flex-1 py-3 rounded-2xl font-semibold text-white transition" :class="outline && !isLoading ? 'gradient-bg hover:scale-[1.01]' : 'bg-gray-400 cursor-not-allowed'">
+                                            <span v-if="!isLoading"><i class="fas fa-check mr-2"></i>确认并生成细纲</span>
+                                            <span v-else class="loading-dots"><span></span><span></span><span></span></span>
+                                        </button>
+                                        <button @click="regenerateOutline" :disabled="isLoading" class="px-6 py-3 rounded-2xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition">
+                                            <i class="fas fa-redo mr-2"></i>重新生成
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div v-else-if="currentStep === 'detailed-outline'" key="detailed-outline" class="bg-white rounded-3xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold text-gray-900 mb-6"><i class="fas fa-stream text-purple-500 mr-3"></i>详细细纲</h3>
+                                    <textarea v-model="detailedOutline" rows="18" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar content-area" placeholder="AI 生成的细纲会显示在此处，包含每个情节点的逻辑与转折，您可以继续调整"></textarea>
+                                    <div class="flex flex-wrap gap-4 mt-6">
+                                        <button @click="confirmDetailedOutline" :disabled="!detailedOutline || isLoading" class="flex-1 py-3 rounded-2xl font-semibold text-white transition" :class="detailedOutline && !isLoading ? 'gradient-bg hover:scale-[1.01]' : 'bg-gray-400 cursor-not-allowed'">
+                                            <span v-if="!isLoading"><i class="fas fa-list-check mr-2"></i>确认并生成章节摘要</span>
+                                            <span v-else class="loading-dots"><span></span><span></span><span></span></span>
+                                        </button>
+                                        <button @click="regenerateDetailedOutline" :disabled="isLoading" class="px-6 py-3 rounded-2xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition">
+                                            <i class="fas fa-redo mr-2"></i>重新生成
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div v-else-if="currentStep === 'chapter-creation'" key="chapter-creation" class="space-y-6">
+                                    <div class="bg-white rounded-3xl shadow-xl p-6">
+                                        <div class="flex flex-wrap items-center justify-between gap-4">
+                                            <div>
+                                                <h3 class="text-xl font-bold text-gray-900">章节摘要规划</h3>
+                                                <p class="text-sm text-gray-500 mt-1">AI 将输出章节名称、摘要及情节重心，作为后续写作的细纲。</p>
+                                            </div>
+                                            <div class="flex flex-wrap gap-3">
+                                                <button @click="generateChapterSummaries" class="px-4 py-2 rounded-xl gradient-bg text-white hover:opacity-90 transition"><i class="fas fa-wand-magic-sparkles mr-2"></i>AI 生成</button>
+                                                <button @click="addChapterManually" class="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition"><i class="fas fa-plus mr-2"></i>手动新增章节</button>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-gray-400 mt-3">提示：若浏览器不支持 File API 或用户未授权，章节数据将自动保存在本地缓存，仍可随时导出。</p>
+                                    </div>
+
+                                    <div v-if="!chapters.length" class="bg-white rounded-3xl shadow-xl p-10 text-center text-gray-500">
+                                        <p>尚未生成章节摘要，点击上方“AI 生成”或“手动新增章节”开始规划。</p>
+                                    </div>
+
+                                    <div v-else class="bg-white rounded-3xl shadow-xl p-6">
+                                        <h3 class="text-xl font-bold text-gray-900 mb-4"><i class="fas fa-book-open text-purple-500 mr-3"></i>章节列表</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                            <div v-for="(chapter, index) in chapters" :key="chapter.id" @click="selectChapter(index)" class="p-4 border-2 rounded-2xl cursor-pointer transition hover:shadow-lg" :class="currentChapterIndex === index ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-200'">
+                                                <div class="flex items-start justify-between">
+                                                    <div>
+                                                        <p class="text-xs text-gray-500">第 {{ index + 1 }} 章</p>
+                                                        <p class="font-semibold text-gray-900 mt-1 line-clamp-2">{{ chapter.title || '未命名' }}</p>
+                                                    </div>
+                                                    <span class="text-sm" :class="{
+                                                        'text-green-500': chapter.status === 'completed',
+                                                        'text-yellow-500': chapter.status === 'drafting',
+                                                        'text-gray-400': chapter.status === 'planning'
+                                                    }">
+                                                        <i class="fas" :class="{
+                                                            'fa-check-circle': chapter.status === 'completed',
+                                                            'fa-pen': chapter.status === 'drafting',
+                                                            'fa-circle': chapter.status === 'planning'
+                                                        }"></i>
+                                                    </span>
+                                                </div>
+                                                <p class="text-xs text-gray-500 mt-3 line-clamp-3">{{ chapter.summary || '尚未填写摘要' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div v-if="currentChapter" class="bg-white rounded-3xl shadow-xl p-8">
+                                        <h3 class="text-2xl font-bold text-gray-900 mb-6">第 {{ currentChapterIndex + 1 }} 章 · {{ currentChapter.title || '章节编辑' }}</h3>
+
+                                        <template v-if="chapterSubStep === 'summary'">
+                                            <div class="space-y-6">
+                                                <div>
+                                                    <label class="text-sm font-semibold text-gray-600">章节标题</label>
+                                                    <input v-model="currentChapter.title" type="text" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent" />
+                                                </div>
+                                                <div>
+                                                    <label class="text-sm font-semibold text-gray-600">章节摘要</label>
+                                                    <textarea v-model="currentChapter.summary" rows="6" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar"></textarea>
+                                                </div>
+                                                <button @click="generateChapterContent" :disabled="!currentChapter.summary || isLoading" class="w-full py-3 rounded-2xl font-semibold text-white transition" :class="currentChapter.summary && !isLoading ? 'gradient-bg hover:scale-[1.01]' : 'bg-gray-400 cursor-not-allowed'">
+                                                    <span v-if="!isLoading"><i class="fas fa-magic mr-2"></i>生成章节正文</span>
+                                                    <span v-else class="loading-dots"><span></span><span></span><span></span></span>
+                                                </button>
+                                            </div>
+                                        </template>
+
+                                        <template v-else-if="chapterSubStep === 'content'">
+                                            <div class="space-y-6">
+                                                <div>
+                                                    <label class="text-sm font-semibold text-gray-600">章节正文</label>
+                                                    <textarea v-model="currentChapter.content" rows="18" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar content-area"></textarea>
+                                                </div>
+                                                <div class="flex flex-wrap gap-4">
+                                                    <button @click="updateMetadata" :disabled="!currentChapter.content || isLoading" class="flex-1 py-3 rounded-2xl font-semibold text-white transition" :class="currentChapter.content && !isLoading ? 'gradient-bg hover:scale-[1.01]' : 'bg-gray-400 cursor-not-allowed'">
+                                                        <span v-if="!isLoading"><i class="fas fa-database mr-2"></i>分析并更新元数据</span>
+                                                        <span v-else class="loading-dots"><span></span><span></span><span></span></span>
+                                                    </button>
+                                                    <button @click="regenerateChapterContent" :disabled="isLoading" class="px-6 py-3 rounded-2xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition">
+                                                        <i class="fas fa-redo mr-2"></i>重新生成
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template v-else-if="chapterSubStep === 'metadata'">
+                                            <div class="space-y-6">
+                                                <div>
+                                                    <label class="text-sm font-semibold text-gray-600">角色信息与性格变化</label>
+                                                    <textarea v-model="currentChapter.metadata.characters" rows="5" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar"></textarea>
+                                                </div>
+                                                <div>
+                                                    <label class="text-sm font-semibold text-gray-600">剧情推进与冲突</label>
+                                                    <textarea v-model="currentChapter.metadata.plot" rows="5" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar"></textarea>
+                                                </div>
+                                                <div>
+                                                    <label class="text-sm font-semibold text-gray-600">伏笔与线索</label>
+                                                    <textarea v-model="currentChapter.metadata.foreshadowing" rows="5" class="mt-2 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar"></textarea>
+                                                </div>
+                                                <button @click="confirmChapter" class="w-full py-3 rounded-2xl font-semibold text-white gradient-bg hover:scale-[1.01] transition">
+                                                    <i class="fas fa-check mr-2"></i>确认章节并进入下一章
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <div v-if="allChaptersCompleted" class="gradient-bg rounded-3xl shadow-2xl p-10 text-white text-center">
+                                        <i class="fas fa-trophy text-5xl mb-4"></i>
+                                        <h3 class="text-3xl font-bold mb-2">恭喜！所有章节已完成</h3>
+                                        <p class="text-base text-white/80 mb-6">现在可以导出完整小说或继续润色。</p>
+                                        <button @click="exportFinalNovel" class="px-8 py-3 bg-white text-purple-600 rounded-full font-semibold hover:bg-gray-100 transition"><i class="fas fa-download mr-2"></i>导出完整小说</button>
+                                    </div>
+                                </div>
+                            </transition>
+
+                            <div class="grid gap-6 lg:grid-cols-2">
+                                <div class="bg-white rounded-3xl shadow-xl p-6">
+                                    <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2"><i class="fas fa-sparkles text-purple-500"></i> 小说元数据</h3>
+                                    <div class="mt-4 space-y-4">
+                                        <div>
+                                            <p class="text-xs text-gray-500">主角/视角</p>
+                                            <p class="text-sm text-gray-700 mt-1" v-if="aggregatedMetadata.protagonist?.name">
+                                                {{ aggregatedMetadata.protagonist.name }} · {{ aggregatedMetadata.protagonist.traits }} · {{ aggregatedMetadata.protagonist.status }}
+                                            </p>
+                                            <p class="text-sm text-gray-400" v-else>等待章节创作完成后自动汇总。</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500 mb-2">重要角色</p>
+                                            <ul class="space-y-2" v-if="aggregatedMetadata.characters.length">
+                                                <li v-for="role in aggregatedMetadata.characters" :key="role.name" class="text-sm text-gray-700">
+                                                    <span class="font-semibold">{{ role.name }}</span> · {{ role.role }} · {{ role.status }}
+                                                </li>
+                                            </ul>
+                                            <p v-else class="text-sm text-gray-400">暂无角色信息。</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500 mb-2">伏笔与线索</p>
+                                            <ul class="list-disc list-inside text-sm text-gray-700 space-y-1" v-if="aggregatedMetadata.foreshadowing.length">
+                                                <li v-for="(item, idx) in aggregatedMetadata.foreshadowing" :key="idx">{{ item }}</li>
+                                            </ul>
+                                            <p v-else class="text-sm text-gray-400">暂无记录。</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-white rounded-3xl shadow-xl p-6">
+                                    <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2"><i class="fas fa-pen-nib text-purple-500"></i> 创作手记</h3>
+                                    <textarea v-model="metadataNotes" rows="8" placeholder="记录灵感、设定补充、后续待办..." class="mt-4 w-full px-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-purple-400 focus:border-transparent custom-scrollbar"></textarea>
+                                    <div class="flex flex-wrap gap-3 mt-4">
+                                        <button @click="manualSave" class="px-4 py-2 rounded-xl gradient-bg text-white hover:opacity-90 transition"><i class="fas fa-save mr-2"></i>保存手记</button>
+                                        <button @click="exportFinalNovel" class="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition"><i class="fas fa-file-export mr-2"></i>导出文本</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </transition>
+        </main>
+
+        <transition name="slide">
+            <div v-if="toast.show" class="fixed top-4 right-4 px-5 py-4 rounded-2xl text-white toast" :class="{
+                'bg-green-500': toast.type === 'success',
+                'bg-red-500': toast.type === 'error',
+                'bg-blue-500': toast.type === 'info'
+            }">
+                <div class="flex items-center gap-3">
+                    <i class="fas" :class="{
+                        'fa-check-circle': toast.type === 'success',
+                        'fa-exclamation-circle': toast.type === 'error',
+                        'fa-info-circle': toast.type === 'info'
+                    }"></i>
+                    <span>{{ toast.message }}</span>
+                </div>
+            </div>
+        </transition>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/ai-service.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
